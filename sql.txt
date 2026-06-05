@@ -1,0 +1,129 @@
+-- Tạo database với encoding utf8mb4 để hỗ trợ tiếng Việt có dấu chuẩn xác
+CREATE DATABASE IF NOT EXISTS ShopGroupDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE ShopGroupDB;
+
+-- ============================================================
+-- 1. BRANDS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS brands (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    logo_url VARCHAR(500),
+    owner_name VARCHAR(100),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- 2. CATEGORIES
+-- ============================================================
+CREATE TABLE IF NOT EXISTS categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    brand_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) NOT NULL,
+    UNIQUE (brand_id, slug),
+    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- 3. PRODUCTS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    brand_id INT NOT NULL,
+    category_id INT NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    specs VARCHAR(500),
+    description TEXT,
+    price BIGINT NOT NULL DEFAULT 0,
+    image_url VARCHAR(500),
+    visible TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES categories(id)
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- 4. TAGS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tags (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- 5. PRODUCT_TAGS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS product_tags (
+    product_id INT NOT NULL,
+    tag_id INT NOT NULL,
+    PRIMARY KEY (product_id, tag_id),
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- 6. ADMINS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS admins (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    brand_id INT NULL,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    is_superadmin TINYINT(1) NOT NULL DEFAULT 0,
+    role VARCHAR(20) NOT NULL DEFAULT 'admin',
+    full_name VARCHAR(150),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- DỮ LIỆU MẪU
+-- ============================================================
+
+INSERT INTO brands (name, slug, description, owner_name) VALUES
+('Acer',          'acer',          'Tập đoàn công nghệ Đài Loan',        'Thành viên 1'),
+('Nhãn hàng 2',   'brand-2',       'Mô tả nhãn hàng thành viên 2',       'Thành viên 2'),
+('Nhãn hàng 3',   'brand-3',       'Mô tả nhãn hàng thành viên 3',       'Thành viên 3'),
+('Nhãn hàng 4',   'brand-4',       'Mô tả nhãn hàng thành viên 4',       'Thành viên 4'),
+('Nhãn hàng 5',   'brand-5',       'Mô tả nhãn hàng thành viên 5',       'Thành viên 5');
+
+INSERT INTO categories (brand_id, name, slug) VALUES
+(1, 'Laptop gaming',    'laptop-gaming'),
+(1, 'Laptop văn phòng', 'laptop-vanphong'),
+(1, 'Màn hình',         'man-hinh'),
+(1, 'Máy tính bàn',     'may-tinh-ban'),
+(1, 'Phụ kiện',         'phu-kien');
+
+-- Lấy ID danh mục (Dùng biến MySQL)
+SET @cat_gaming = (SELECT id FROM categories WHERE brand_id=1 AND slug='laptop-gaming');
+SET @cat_office = (SELECT id FROM categories WHERE brand_id=1 AND slug='laptop-vanphong');
+SET @cat_acc    = (SELECT id FROM categories WHERE brand_id=1 AND slug='phu-kien');
+
+INSERT INTO products (brand_id, category_id, name, specs, price) VALUES
+(1, @cat_gaming, 'Predator Helios 300', 'Intel i7-12700H, RTX 3070, 16GB RAM, 512GB SSD', 32990000),
+(1, @cat_gaming, 'Nitro 5',             'Intel i5-12500H, RTX 3050, 8GB RAM, 512GB SSD',  21490000),
+(1, @cat_office, 'Swift 3',             'Intel i5-1235U, Iris Xe, 16GB RAM, 512GB SSD',   16990000),
+(1, @cat_office, 'Aspire 5',            'Intel i3-1215U, UHD, 8GB RAM, 256GB SSD',        12490000),
+(1, @cat_acc,    'Chuột Predator 315',  'Optical 16000 DPI, RGB, 7 nút, USB',             890000),
+(1, @cat_acc,    'Phím Predator 300',   'Switch Blue, RGB, TKL, chống nước',              1490000);
+
+INSERT INTO tags (name) VALUES
+('gaming'), ('văn phòng'), ('cao cấp'), ('phổ thông'),
+('mỏng nhẹ'), ('pin trâu'), ('màn hình lớn'), ('RGB'),
+('học sinh'), ('doanh nghiệp'), ('mới nhất'), ('bán chạy');
+
+-- Insert product tags bằng subquery thay vì FROM 2 bảng để tương thích tốt với MySQL
+INSERT INTO product_tags (product_id, tag_id)
+SELECT p.id, t.id FROM products p JOIN tags t 
+ON p.name = 'Predator Helios 300' AND t.name IN ('gaming', 'cao cấp', 'RGB');
+
+INSERT INTO product_tags (product_id, tag_id)
+SELECT p.id, t.id FROM products p JOIN tags t 
+ON p.name = 'Nitro 5' AND t.name IN ('gaming', 'phổ thông', 'học sinh');
+
+INSERT INTO product_tags (product_id, tag_id)
+SELECT p.id, t.id FROM products p JOIN tags t 
+ON p.name = 'Swift 3' AND t.name IN ('văn phòng', 'mỏng nhẹ', 'pin trâu');
